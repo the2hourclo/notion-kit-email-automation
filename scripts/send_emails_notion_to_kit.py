@@ -329,20 +329,12 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
     # Determine recipient settings based on segments
     recipient_settings = {}
 
-    # SAFETY MODE: If TEST_MODE is enabled, send only to TEST_EMAIL
+    # SAFETY MODE: If TEST_MODE is enabled, log warning but use segments normally
     if TEST_MODE:
-        if not TEST_EMAIL:
-            logger.error("❌ TEST_MODE enabled but TEST_EMAIL not set - cannot send")
-            return None
+        logger.warning("🔒 TEST MODE ENABLED - Make sure your segments are set to Test!")
+        logger.warning(f"    Verify 'Test' segment contains only: {TEST_EMAIL if TEST_EMAIL else 'your test email'}")
 
-        logger.warning("🔒 TEST MODE ACTIVE - Sending only to: " + TEST_EMAIL)
-        recipient_settings = {
-            "subscriber_filter": {
-                "filter": "email",
-                "match": TEST_EMAIL
-            }
-        }
-    elif not segments or "Everyone" in segments:
+    if not segments or "Everyone" in segments:
         # Send to all subscribers
         recipient_settings = {
             "send_to_all": True
