@@ -376,14 +376,16 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
         "preview_text": preview_text,
         "content": html_body,
         "public": False,
-        "send_at": publish_date if publish_date else None,  # Changed from published_at to send_at
+        "send_at": publish_date_utc,  # Use the converted UTC timestamp
         **recipient_settings
     }
 
     # Log the exact payload being sent to Kit
     logger.info(f"📤 Creating Kit broadcast")
-    logger.info(f"   ⏰ Scheduled for: {publish_date}")
-    logger.info(f"   📋 Payload: {json.dumps({k: v for k, v in payload.items() if k != 'content'}, indent=2)}")
+    logger.info(f"   ⏰ Original Notion date: {publish_date}")
+    logger.info(f"   ⏰ Converted UTC date: {payload.get('send_at')}")
+    logger.info(f"   📋 Full Payload (without content):")
+    logger.info(json.dumps({k: v for k, v in payload.items() if k != 'content'}, indent=2))
 
     try:
         response = requests.post(url, headers=KIT_HEADERS, json=payload)
