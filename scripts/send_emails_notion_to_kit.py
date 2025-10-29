@@ -505,6 +505,9 @@ def process_email(email_page: Dict) -> bool:
             logger.warning(f"    To send this email, update its Publish Date to a future date with time")
             return False
 
+        # Convert to UTC ISO format for Kit API (YYYY-MM-DDTHH:MM:SSZ)
+        publish_date_utc = publish_datetime.strftime('%Y-%m-%dT%H:%M:%SZ')
+
     except Exception as e:
         logger.error(f"❌ Error parsing Publish Date '{publish_date}': {e}")
         return False
@@ -538,7 +541,7 @@ def process_email(email_page: Dict) -> bool:
         subject=subject,
         preview_text=pre_text,
         html_body=html_body,
-        publish_date=publish_date,
+        publish_date=publish_date_utc,
         segments=segments
     )
 
