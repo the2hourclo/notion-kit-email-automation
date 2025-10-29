@@ -343,33 +343,35 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
         # Send to specific Kit tags/segments
         subscriber_filters = []
 
+        tag_ids = []
+        segment_ids = []
+
         for segment_name in segments:
             # Try to find as a tag first
             tag_id = get_kit_tag_id(segment_name)
             if tag_id:
-                subscriber_filters.append({
-                    "filter_type": "tag",
-                    "tag_id": tag_id
-                })
-                logger.info(f"📧 Adding filter for Kit tag: {segment_name} (ID: {tag_id})")
+                tag_ids.append(tag_id)
+                logger.info(f"📧 Found Kit tag: {segment_name} (ID: {tag_id})")
             else:
                 # Try to find as a segment
                 segment_id = get_kit_segment_id(segment_name)
                 if segment_id:
-                    subscriber_filters.append({
-                        "filter_type": "segment",
-                        "segment_id": segment_id
-                    })
-                    logger.info(f"📧 Adding filter for Kit segment: {segment_name} (ID: {segment_id})")
+                    segment_ids.append(segment_id)
+                    logger.info(f"📧 Found Kit segment: {segment_name} (ID: {segment_id})")
                 else:
                     logger.warning(f"⚠️  Segment/Tag '{segment_name}' not found in Kit - skipping")
 
-        if not subscriber_filters:
+        if not tag_ids and not segment_ids:
             logger.error("❌ No valid Kit tags or segments found - cannot send")
             return None
 
-        # Add subscriber filters to recipient settings
-        recipient_settings['subscriber_filters'] = subscriber_filters
+        # Add recipient filters - try simple format first
+        if segment_ids:
+            recipient_settings['segment_id'] = segment_ids[0]  # Try single segment ID
+            logger.info(f"📧 Setting segment_id: {segment_ids[0]}")
+        elif tag_ids:
+            recipient_settings['tag_id'] = tag_ids[0]  # Try single tag ID
+            logger.info(f"📧 Setting tag_id: {tag_ids[0]}")
 
     payload = {
         "subject": subject,
@@ -516,7 +518,8 @@ def process_email(email_page: Dict) -> bool:
         return False
 
     logger.info(f"Processing email: {subject}")
-    logger.info(f"  Publish Date: {publish_date}")
+    logger.info(f"  Publish Date (raw from Notion): {publish_date}")
+    logger.info(f"  Publish Date (converted to UTC): {publish_date_utc}")
     logger.info(f"  Segments: {segments}")
 
     # Get page content blocks
