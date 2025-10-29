@@ -376,7 +376,7 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
         "preview_text": preview_text,
         "content": html_body,
         "public": False,
-        "send_at": publish_date_utc,  # Use the converted UTC timestamp
+        "send_at": publish_date,  # This is already the UTC timestamp passed as parameter
         **recipient_settings
     }
 
