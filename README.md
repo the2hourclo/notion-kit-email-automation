@@ -8,8 +8,10 @@ Automatically send emails from your Notion database to Kit (ConvertKit) with ima
 ✅ **Image Hosting** - Auto-upload images to Cloudinary for permanent URLs
 ✅ **Performance Tracking** - Sync Open Rate, Click Rate, Recipients back to Notion
 ✅ **Test Mode** - Send test emails to yourself before going live
+✅ **Safety Checks** - Automatically skips emails with past dates
 ✅ **Manual + Automatic** - Trigger manually or run daily automatically
 ✅ **Rich Formatting** - Supports bold, italic, links, lists, headings, images
+✅ **Smart Segments** - Auto-map Notion segments to Kit tags
 
 ---
 
@@ -113,6 +115,7 @@ Automatically send emails from your Notion database to Kit (ConvertKit) with ima
    | `CLOUDINARY_API_KEY` | Your Cloudinary API Key | Step 3.2 |
    | `CLOUDINARY_API_SECRET` | Your Cloudinary API Secret | Step 3.2 |
    | `EMAILS_DATABASE_ID` | Your Notion Database ID | Step 1.5 |
+   | `TEST_MODE` | `true` or `false` | Set to `true` for testing |
    | `TEST_EMAIL` | Your test email address | Your personal email subscribed to Kit |
 
 ---
@@ -158,11 +161,40 @@ Automatically send emails from your Notion database to Kit (ConvertKit) with ima
 
 **Always test first!**
 
-1. Set Segments = "Test"
+#### Test Mode (Recommended for First Run)
+
+1. **Enable Test Mode:**
+   - Go to GitHub → Settings → Secrets
+   - Set `TEST_MODE=true` and `TEST_EMAIL=your@email.com`
+
+2. **Create Test Email:**
+   - Name: "TEST - First Email"
+   - SL1: "Testing automation"
+   - Publish Date: Set to 5 minutes from now (MUST be future date!)
+   - Segments: Test (or any segment)
+   - Status: Ready to Send
+
+3. **Run Workflow:**
+   - GitHub → Actions → "Send Emails from Notion to Kit"
+   - Click "Run workflow"
+
+4. **Verify:**
+   - Check your test email inbox
+   - Verify images display correctly
+   - Verify Notion updated to "Scheduled & Sent"
+
+5. **Disable Test Mode:**
+   - Set `TEST_MODE=false` in GitHub Secrets
+   - Now emails will send to actual segments
+
+#### Quick Test (Using Kit Segments)
+
+1. Set Segments = "Test" (must match a Kit segment/tag name)
 2. Set Status = "Ready to Send"
-3. Trigger workflow
-4. Check your test email inbox
-5. Once verified, duplicate email, set Segments = "Everyone", send again
+3. Set Publish Date to future date
+4. Trigger workflow
+5. Check your test email inbox
+6. Once verified, duplicate email, set Segments = "Everyone", send again
 
 ---
 
@@ -187,16 +219,59 @@ Automatically send emails from your Notion database to Kit (ConvertKit) with ima
 
 ---
 
+## Safety Features
+
+### 🔒 Past Date Protection
+
+**Automatic protection against sending old emails:**
+- Emails with past Publish Dates are automatically skipped
+- Prevents accidentally sending dozens of old "Ready to Send" emails
+- Shows clear warning in logs with instructions
+
+**Example log:**
+```
+⏭️  SKIPPED: Email 'Old Newsletter' has past Publish Date (2024-08-30)
+    Current time: 2025-10-29T08:00:00+00:00
+    To send this email, update its Publish Date to a future date
+```
+
+### 🧪 Test Mode
+
+**Send all emails only to your test email:**
+- Override all segment settings
+- Perfect for testing without risking production sends
+- Enable: Set `TEST_MODE=true` in GitHub Secrets
+- Disable: Set `TEST_MODE=false`
+
+**When Test Mode is active:**
+```
+🔒 TEST MODE ENABLED - All emails will be sent ONLY to: your@email.com
+    Set TEST_MODE=false to disable test mode
+```
+
+### 📊 Smart Segment Mapping
+
+**Automatically finds Kit tags/segments by name:**
+- Notion segment "Test" → Finds Kit segment/tag "Test"
+- Notion segment "Everyone" or empty → Sends to all subscribers
+- Any custom segment name → Searches Kit for matching tag/segment
+- If not found → Logs warning and skips email
+
+**See [SAFETY-CHECKS.md](SAFETY-CHECKS.md) for complete list of protections and potential issues.**
+
+---
+
 ## Troubleshooting
 
 ### Email Not Sending
 
 **Check:**
 - ✅ E-mail Status = "Ready to Send" (not Draft!)
-- ✅ Publish Date is set
+- ✅ Publish Date is set AND in the future
 - ✅ SL1 or Name is filled (subject line)
 - ✅ Email has content blocks
 - ✅ GitHub Secrets are configured correctly
+- ✅ If using segments, verify they exist in Kit
 
 **View Logs:**
 - GitHub → Actions → Click on workflow run → View logs
@@ -306,10 +381,17 @@ Automatically send emails from your Notion database to Kit (ConvertKit) with ima
 
 ## Segments Logic
 
-| Segment | Behavior |
+| Segment in Notion | Behavior |
 |---------|----------|
-| **Test** | Sends only to TEST_EMAIL address |
+| **TEST_MODE=true** | Overrides all settings - sends ONLY to TEST_EMAIL |
 | **Everyone** (or empty) | Sends to all subscribers |
+| **Test** | Finds Kit segment/tag named "Test" |
+| **Any custom name** | Searches Kit for matching segment/tag by name |
+
+**Examples:**
+- Notion segment "Premium Users" → Searches Kit for tag/segment "Premium Users"
+- If not found in Kit → Logs warning and skips email
+- Segment names are case-insensitive
 
 ---
 

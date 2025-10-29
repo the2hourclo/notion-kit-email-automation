@@ -8,7 +8,7 @@ import os
 import sys
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import logging
 
@@ -30,6 +30,8 @@ CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME')
 CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY')
 CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET')
 EMAILS_DATABASE_ID = os.environ.get('EMAILS_DATABASE_ID', 'c2a53e49-4500-48c0-8344-dfcc6066b89f')
+TEST_MODE = os.environ.get('TEST_MODE', 'false').lower() == 'true'
+TEST_EMAIL = os.environ.get('TEST_EMAIL', '')
 
 # API Headers
 NOTION_HEADERS = {
@@ -318,6 +320,7 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
     """Create a Kit broadcast and return broadcast ID
 
     Segments mapping:
+    - TEST_MODE=true → Override all settings and send only to TEST_EMAIL
     - Empty or "Everyone" → Send to ALL subscribers
     - Any other segment name → Send to Kit tag/segment with that name
     """
@@ -326,7 +329,20 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
     # Determine recipient settings based on segments
     recipient_settings = {}
 
-    if not segments or "Everyone" in segments:
+    # SAFETY MODE: If TEST_MODE is enabled, send only to TEST_EMAIL
+    if TEST_MODE:
+        if not TEST_EMAIL:
+            logger.error("❌ TEST_MODE enabled but TEST_EMAIL not set - cannot send")
+            return None
+
+        logger.warning("🔒 TEST MODE ACTIVE - Sending only to: " + TEST_EMAIL)
+        recipient_settings = {
+            "subscriber_filter": {
+                "filter": "email",
+                "match": TEST_EMAIL
+            }
+        }
+    elif not segments or "Everyone" in segments:
         # Send to all subscribers
         recipient_settings = {
             "send_to_all": True
@@ -372,12 +388,20 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
         **recipient_settings
     }
 
+    # Log the exact payload being sent to Kit
+    logger.info(f"📤 Creating Kit broadcast with published_at: {publish_date}")
+    if 'T' in (publish_date or ''):
+        logger.info(f"   ⏰ Scheduled for SPECIFIC TIME: {publish_date}")
+    else:
+        logger.info(f"   📅 Scheduled for DATE ONLY: {publish_date}")
+        logger.warning(f"   ⚠️  Kit may send immediately! Consider adding a time in Notion.")
+
     try:
         response = requests.post(url, headers=KIT_HEADERS, json=payload)
         response.raise_for_status()
         broadcast = response.json().get('broadcast', {})
         broadcast_id = str(broadcast.get('id'))
-        logger.info(f"Created Kit broadcast: {broadcast_id}")
+        logger.info(f"✅ Created Kit broadcast: {broadcast_id}")
         return broadcast_id
     except requests.exceptions.RequestException as e:
         logger.error(f"Error creating Kit broadcast: {e}")
@@ -473,6 +497,35 @@ def process_email(email_page: Dict) -> bool:
         logger.error(f"Email {page_id} has no Publish Date")
         return False
 
+    # SAFETY CHECK: Skip emails with past publish dates
+    try:
+        # Parse the publish date (format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
+        if 'T' in publish_date:
+            # DateTime with time component - use exact time
+            publish_datetime = datetime.fromisoformat(publish_date.replace('Z', '+00:00'))
+            now = datetime.now(timezone.utc)
+
+            if publish_datetime < now:
+                logger.warning(f"⏭️  SKIPPED: Email '{subject}' has past Publish Date ({publish_date})")
+                logger.warning(f"    Current time: {now.isoformat()}")
+                logger.warning(f"    To send this email, update its Publish Date to a future date")
+                return False
+        else:
+            # Date-only format (YYYY-MM-DD) - use end of day UTC to be lenient
+            # This gives the full 24-hour period regardless of user's timezone
+            publish_datetime = datetime.fromisoformat(publish_date + 'T23:59:59+00:00')
+            now = datetime.now(timezone.utc)
+
+            if publish_datetime < now:
+                logger.warning(f"⏭️  SKIPPED: Email '{subject}' has past Publish Date ({publish_date})")
+                logger.warning(f"    Current date: {now.date().isoformat()}")
+                logger.warning(f"    To send this email, update its Publish Date to a future date")
+                return False
+
+    except Exception as e:
+        logger.error(f"Error parsing Publish Date '{publish_date}': {e}")
+        return False
+
     logger.info(f"Processing email: {subject}")
     logger.info(f"  Publish Date: {publish_date}")
     logger.info(f"  Segments: {segments}")
@@ -527,6 +580,13 @@ def main():
     logger.info("=" * 50)
     logger.info("Starting Notion to Kit Email Automation")
     logger.info("=" * 50)
+
+    # Show test mode status
+    if TEST_MODE:
+        logger.warning("🔒 TEST MODE ENABLED - All emails will be sent ONLY to: " + TEST_EMAIL)
+        logger.warning("    Set TEST_MODE=false to disable test mode")
+    else:
+        logger.info("📧 PRODUCTION MODE - Emails will be sent to configured segments")
 
     # Validate environment variables
     required_vars = [
