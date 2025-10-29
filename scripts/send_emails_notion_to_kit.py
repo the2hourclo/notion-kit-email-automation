@@ -520,6 +520,12 @@ def process_email(email_page: Dict) -> bool:
         publish_datetime = datetime.fromisoformat(publish_date.replace('Z', '+00:00'))
         now = datetime.now(timezone.utc)
 
+        logger.info(f"🕐 Timezone debugging:")
+        logger.info(f"   Raw from Notion: {publish_date}")
+        logger.info(f"   Parsed datetime object: {publish_datetime}")
+        logger.info(f"   Timezone info: {publish_datetime.tzinfo}")
+        logger.info(f"   UTC timestamp: {publish_datetime.astimezone(timezone.utc)}")
+
         if publish_datetime < now:
             logger.warning(f"⏭️  SKIPPED: Email '{subject}' has past Publish Date ({publish_date})")
             logger.warning(f"    Current time: {now.isoformat()}")
@@ -527,15 +533,14 @@ def process_email(email_page: Dict) -> bool:
             return False
 
         # Convert to UTC ISO format for Kit API (YYYY-MM-DDTHH:MM:SSZ)
-        publish_date_utc = publish_datetime.strftime('%Y-%m-%dT%H:%M:%SZ')
+        publish_date_utc = publish_datetime.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     except Exception as e:
         logger.error(f"❌ Error parsing Publish Date '{publish_date}': {e}")
         return False
 
     logger.info(f"Processing email: {subject}")
-    logger.info(f"  Publish Date (raw from Notion): {publish_date}")
-    logger.info(f"  Publish Date (converted to UTC): {publish_date_utc}")
+    logger.info(f"  Final UTC time sent to Kit: {publish_date_utc}")
     logger.info(f"  Segments: {segments}")
 
     # Get page content blocks
