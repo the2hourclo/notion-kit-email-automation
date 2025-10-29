@@ -30,8 +30,6 @@ CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME')
 CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY')
 CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET')
 EMAILS_DATABASE_ID = os.environ.get('EMAILS_DATABASE_ID', 'c2a53e49-4500-48c0-8344-dfcc6066b89f')
-TEST_MODE = os.environ.get('TEST_MODE', 'false').lower() == 'true'
-TEST_EMAIL = os.environ.get('TEST_EMAIL', '')
 
 # API Headers
 NOTION_HEADERS = {
@@ -329,11 +327,6 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
     # Determine recipient settings based on segments
     recipient_settings = {}
 
-    # SAFETY MODE: If TEST_MODE is enabled, log warning but use segments normally
-    if TEST_MODE:
-        logger.warning("🔒 TEST MODE ENABLED - Make sure your segments are set to Test!")
-        logger.warning(f"    Verify 'Test' segment contains only: {TEST_EMAIL if TEST_EMAIL else 'your test email'}")
-
     if not segments or "Everyone" in segments:
         # Send to all subscribers - don't add any recipient filter
         if not segments:
@@ -593,13 +586,6 @@ def main():
     logger.info("=" * 50)
     logger.info("Starting Notion to Kit Email Automation")
     logger.info("=" * 50)
-
-    # Show test mode status
-    if TEST_MODE:
-        logger.warning("🔒 TEST MODE ENABLED - All emails will be sent ONLY to: " + TEST_EMAIL)
-        logger.warning("    Set TEST_MODE=false to disable test mode")
-    else:
-        logger.info("📧 PRODUCTION MODE - Emails will be sent to configured segments")
 
     # Validate environment variables
     required_vars = [
