@@ -341,8 +341,7 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
         logger.info("📧 Sending to: ALL subscribers")
     else:
         # Send to specific Kit tags/segments
-        subscriber_filters = []
-
+        # Use the correct Kit API format for subscriber_filter
         tag_ids = []
         segment_ids = []
 
@@ -365,13 +364,30 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
             logger.error("❌ No valid Kit tags or segments found - cannot send")
             return None
 
-        # Add recipient filters - try simple format first
+        # Build subscriber_filter in the correct Kit API format
+        filter_conditions = []
+
         if segment_ids:
-            recipient_settings['segment_id'] = segment_ids[0]  # Try single segment ID
-            logger.info(f"📧 Setting segment_id: {segment_ids[0]}")
-        elif tag_ids:
-            recipient_settings['tag_id'] = tag_ids[0]  # Try single tag ID
-            logger.info(f"📧 Setting tag_id: {tag_ids[0]}")
+            filter_conditions.append({
+                "type": "segment",
+                "ids": segment_ids
+            })
+            logger.info(f"📧 Adding segment filter with IDs: {segment_ids}")
+
+        if tag_ids:
+            filter_conditions.append({
+                "type": "tag",
+                "ids": tag_ids
+            })
+            logger.info(f"📧 Adding tag filter with IDs: {tag_ids}")
+
+        recipient_settings['subscriber_filter'] = [
+            {
+                "all": filter_conditions,
+                "any": None,
+                "none": None
+            }
+        ]
 
     payload = {
         "subject": subject,
