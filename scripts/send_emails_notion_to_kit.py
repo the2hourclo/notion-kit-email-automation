@@ -336,6 +336,8 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
 
     if not segments or "Everyone" in segments:
         # Send to all subscribers - don't add any recipient filter
+        if not segments:
+            logger.warning("⚠️  No segments specified - sending to ALL subscribers!")
         logger.info("📧 Sending to: ALL subscribers")
     else:
         # Send to specific Kit tags/segments
