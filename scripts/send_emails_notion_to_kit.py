@@ -389,12 +389,8 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
     }
 
     # Log the exact payload being sent to Kit
-    logger.info(f"📤 Creating Kit broadcast with published_at: {publish_date}")
-    if 'T' in (publish_date or ''):
-        logger.info(f"   ⏰ Scheduled for SPECIFIC TIME: {publish_date}")
-    else:
-        logger.info(f"   📅 Scheduled for DATE ONLY: {publish_date}")
-        logger.warning(f"   ⚠️  Kit may send immediately! Consider adding a time in Notion.")
+    logger.info(f"📤 Creating Kit broadcast")
+    logger.info(f"   ⏰ Scheduled for: {publish_date}")
 
     try:
         response = requests.post(url, headers=KIT_HEADERS, json=payload)
@@ -494,36 +490,31 @@ def process_email(email_page: Dict) -> bool:
         return False
 
     if not publish_date:
-        logger.error(f"Email {page_id} has no Publish Date")
+        logger.error(f"❌ Email '{subject}' has no Publish Date")
+        return False
+
+    # SAFETY CHECK: Require time component in Publish Date
+    if 'T' not in publish_date:
+        logger.error(f"❌ SKIPPED: Email '{subject}' has date-only Publish Date ({publish_date})")
+        logger.error(f"    Publish Date MUST include a time (e.g., 6:30 PM)")
+        logger.error(f"    In Notion: Click on date → Enable time toggle → Set specific time")
+        logger.error(f"    This ensures emails send at your intended time in EST")
         return False
 
     # SAFETY CHECK: Skip emails with past publish dates
     try:
-        # Parse the publish date (format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
-        if 'T' in publish_date:
-            # DateTime with time component - use exact time
-            publish_datetime = datetime.fromisoformat(publish_date.replace('Z', '+00:00'))
-            now = datetime.now(timezone.utc)
+        # Parse the publish date (format: YYYY-MM-DDTHH:MM:SS)
+        publish_datetime = datetime.fromisoformat(publish_date.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
 
-            if publish_datetime < now:
-                logger.warning(f"⏭️  SKIPPED: Email '{subject}' has past Publish Date ({publish_date})")
-                logger.warning(f"    Current time: {now.isoformat()}")
-                logger.warning(f"    To send this email, update its Publish Date to a future date")
-                return False
-        else:
-            # Date-only format (YYYY-MM-DD) - use end of day UTC to be lenient
-            # This gives the full 24-hour period regardless of user's timezone
-            publish_datetime = datetime.fromisoformat(publish_date + 'T23:59:59+00:00')
-            now = datetime.now(timezone.utc)
-
-            if publish_datetime < now:
-                logger.warning(f"⏭️  SKIPPED: Email '{subject}' has past Publish Date ({publish_date})")
-                logger.warning(f"    Current date: {now.date().isoformat()}")
-                logger.warning(f"    To send this email, update its Publish Date to a future date")
-                return False
+        if publish_datetime < now:
+            logger.warning(f"⏭️  SKIPPED: Email '{subject}' has past Publish Date ({publish_date})")
+            logger.warning(f"    Current time: {now.isoformat()}")
+            logger.warning(f"    To send this email, update its Publish Date to a future date with time")
+            return False
 
     except Exception as e:
-        logger.error(f"Error parsing Publish Date '{publish_date}': {e}")
+        logger.error(f"❌ Error parsing Publish Date '{publish_date}': {e}")
         return False
 
     logger.info(f"Processing email: {subject}")

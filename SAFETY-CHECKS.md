@@ -47,8 +47,15 @@ Example log output:
 #### 3. ❌ Missing or Invalid Publish Date
 **Status**: ✅ PROTECTED
 **Risk**: Email would send immediately instead of at scheduled time
-**Protection**: Script validates Publish Date exists and is parseable
+**Protection**: Script validates Publish Date exists, is parseable, and includes time
 **Action needed**: None - validation is active
+
+#### 3a. ❌ Date-Only Publish Date (No Time)
+**Status**: ✅ PROTECTED
+**Risk**: Kit may send immediately or at wrong time instead of intended EST time
+**Protection**: Script rejects emails with date-only Publish Dates
+**Error message**: "Publish Date MUST include a time (e.g., 6:30 PM)"
+**Action needed**: Always set time in Notion's Publish Date field
 
 #### 4. ❌ No Subject Line
 **Status**: ✅ PROTECTED
@@ -169,7 +176,8 @@ Before enabling automation for real subscribers:
   - Name: "TEST - Automation Check"
   - SL1: "Testing automation system"
   - Pre-Text: "This is a test"
-  - Publish Date: Set to 5 minutes from now (future date)
+  - **Publish Date: Set to 5 minutes from now WITH TIME** (e.g., 6:35 PM)
+    - Click date field → Enable time toggle → Set specific time
   - Segments: "Test" (or your test segment name)
   - E-mail Status: "Ready to Send"
   - Add at least one paragraph of content

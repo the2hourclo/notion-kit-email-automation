@@ -130,7 +130,10 @@ Automatically send emails from your Notion database to Kit (ConvertKit) with ima
      - Name: "Day 1 - Welcome Email" (internal reference)
      - SL1: "Welcome to the journey!" (actual subject line)
      - Pre-Text: "Here's what to expect..." (preview text)
-     - Publish Date: Set date/time when email should be sent
+     - **Publish Date: MUST include time** (e.g., 6:30 PM your local time)
+       - Click on date field → Enable time toggle → Set specific time
+       - This ensures email sends at your intended EST time
+       - Date-only will be rejected for safety
      - Segments: Select "Test" (for testing) or "Everyone" (for all subscribers)
      - Write email content in page body (supports images, formatting, lists, etc.)
 
@@ -170,7 +173,7 @@ Automatically send emails from your Notion database to Kit (ConvertKit) with ima
 2. **Create Test Email:**
    - Name: "TEST - First Email"
    - SL1: "Testing automation"
-   - Publish Date: Set to 5 minutes from now (MUST be future date!)
+   - Publish Date: Set to 5 minutes from now **WITH TIME** (e.g., 6:35 PM)
    - Segments: Test (or any segment)
    - Status: Ready to Send
 
@@ -191,7 +194,7 @@ Automatically send emails from your Notion database to Kit (ConvertKit) with ima
 
 1. Set Segments = "Test" (must match a Kit segment/tag name)
 2. Set Status = "Ready to Send"
-3. Set Publish Date to future date
+3. Set Publish Date to future date **WITH TIME**
 4. Trigger workflow
 5. Check your test email inbox
 6. Once verified, duplicate email, set Segments = "Everyone", send again
@@ -267,11 +270,18 @@ Automatically send emails from your Notion database to Kit (ConvertKit) with ima
 
 **Check:**
 - ✅ E-mail Status = "Ready to Send" (not Draft!)
-- ✅ Publish Date is set AND in the future
+- ✅ Publish Date is set AND in the future **WITH TIME INCLUDED**
 - ✅ SL1 or Name is filled (subject line)
 - ✅ Email has content blocks
 - ✅ GitHub Secrets are configured correctly
 - ✅ If using segments, verify they exist in Kit
+
+**Common Error:**
+```
+❌ SKIPPED: Email has date-only Publish Date (2025-10-30)
+    Publish Date MUST include a time (e.g., 6:30 PM)
+```
+**Fix:** Click on Publish Date in Notion → Enable time toggle → Set specific time
 
 **View Logs:**
 - GitHub → Actions → Click on workflow run → View logs
