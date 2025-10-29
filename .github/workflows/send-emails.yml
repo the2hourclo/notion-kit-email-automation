@@ -4,9 +4,9 @@ on:
   # Manual trigger button
   workflow_dispatch:
 
-  # Daily automatic check at 8 AM UTC
+  # Automatic check every 30 minutes
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '*/30 * * * *'
 
 jobs:
   send-emails:

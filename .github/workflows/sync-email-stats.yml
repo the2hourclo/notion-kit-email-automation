@@ -4,9 +4,9 @@ on:
   # Manual trigger button
   workflow_dispatch:
 
-  # Daily automatic sync at 9 AM UTC (1 hour after sending)
+  # Automatic sync every hour
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 * * * *'
 
 jobs:
   sync-stats:
