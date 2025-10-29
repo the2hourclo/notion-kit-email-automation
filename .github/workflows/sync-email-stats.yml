@@ -1,0 +1,42 @@
+name: Sync Email Stats from Kit to Notion
+
+on:
+  # Manual trigger button
+  workflow_dispatch:
+
+  # Daily automatic sync at 9 AM UTC (1 hour after sending)
+  schedule:
+    - cron: '0 9 * * *'
+
+jobs:
+  sync-stats:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Sync email stats from Kit to Notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          KIT_API_KEY: ${{ secrets.KIT_API_KEY }}
+          EMAILS_DATABASE_ID: ${{ secrets.EMAILS_DATABASE_ID }}
+        run: python scripts/sync_email_stats_kit_to_notion.py
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: stats-sync-logs
+          path: scripts/stats_sync.log
+          retention-days: 30
