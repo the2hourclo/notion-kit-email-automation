@@ -335,40 +335,39 @@ def create_kit_broadcast(subject: str, preview_text: str, html_body: str,
         logger.warning(f"    Verify 'Test' segment contains only: {TEST_EMAIL if TEST_EMAIL else 'your test email'}")
 
     if not segments or "Everyone" in segments:
-        # Send to all subscribers
-        recipient_settings = {
-            "send_to_all": True
-        }
+        # Send to all subscribers - don't add any recipient filter
         logger.info("📧 Sending to: ALL subscribers")
     else:
         # Send to specific Kit tags/segments
-        tag_ids = []
-        segment_ids = []
+        subscriber_filters = []
 
         for segment_name in segments:
             # Try to find as a tag first
             tag_id = get_kit_tag_id(segment_name)
             if tag_id:
-                tag_ids.append(tag_id)
+                subscriber_filters.append({
+                    "filter_type": "tag",
+                    "tag_id": tag_id
+                })
+                logger.info(f"📧 Adding filter for Kit tag: {segment_name} (ID: {tag_id})")
             else:
                 # Try to find as a segment
                 segment_id = get_kit_segment_id(segment_name)
                 if segment_id:
-                    segment_ids.append(segment_id)
+                    subscriber_filters.append({
+                        "filter_type": "segment",
+                        "segment_id": segment_id
+                    })
+                    logger.info(f"📧 Adding filter for Kit segment: {segment_name} (ID: {segment_id})")
                 else:
                     logger.warning(f"⚠️  Segment/Tag '{segment_name}' not found in Kit - skipping")
 
-        if not tag_ids and not segment_ids:
+        if not subscriber_filters:
             logger.error("❌ No valid Kit tags or segments found - cannot send")
             return None
 
-        # Kit API supports sending to tags or segments
-        if tag_ids:
-            recipient_settings['tag_ids'] = tag_ids
-            logger.info(f"📧 Sending to Kit tags: {tag_ids}")
-        if segment_ids:
-            recipient_settings['segment_ids'] = segment_ids
-            logger.info(f"📧 Sending to Kit segments: {segment_ids}")
+        # Add subscriber filters to recipient settings
+        recipient_settings['subscriber_filters'] = subscriber_filters
 
     payload = {
         "subject": subject,
