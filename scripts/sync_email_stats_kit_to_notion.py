@@ -119,12 +119,18 @@ def update_notion_email_stats(page_id: str, stats: Dict) -> bool:
     total_opens = stats.get('emails_opened', 0)
     total_clicks = stats.get('total_clicks', 0)
 
-    # Kit provides pre-calculated rates as percentages
-    open_rate = round(stats.get('open_rate', 0), 2)
-    click_rate = round(stats.get('click_rate', 0), 2)
+    # Kit provides pre-calculated rates as percentages (e.g., 18.09 = 18.09%)
+    # Notion percent format expects decimals (e.g., 0.1809 = 18.09%)
+    # Convert: divide by 100 to get decimal format
+    kit_open_rate = stats.get('open_rate', 0)
+    kit_click_rate = stats.get('click_rate', 0)
+
+    open_rate = round(kit_open_rate / 100, 4)  # 18.09 → 0.1809
+    click_rate = round(kit_click_rate / 100, 4)  # 0.23 → 0.0023
 
     logger.info(f"Extracted stats - Recipients: {recipients}, Opens: {total_opens}, Clicks: {total_clicks}")
-    logger.info(f"Kit provided rates - Open Rate: {open_rate}%, Click Rate: {click_rate}%")
+    logger.info(f"Kit rates (percentage): Open Rate: {kit_open_rate}%, Click Rate: {kit_click_rate}%")
+    logger.info(f"Notion rates (decimal): Open Rate: {open_rate}, Click Rate: {click_rate}")
 
     payload = {
         "properties": {
