@@ -212,9 +212,14 @@ def update_notion_email_stats(page_id: str, stats: Dict, content_clicks: int = N
         ctor = 0.0
         logger.info(f"📊 CTOR: No opens yet, CTOR = 0%")
 
-    logger.info(f"Extracted stats - Recipients: {recipients}, Opens: {total_opens}, Total Clicks: {total_clicks}, Content Clicks: {clicks_for_ctor}")
+    logger.info(f"Extracted stats - Recipients: {recipients}, Opens: {total_opens}, Kit Total Clicks: {total_clicks}, Content Clicks: {clicks_for_ctor}")
     logger.info(f"Open Rate (Kit): {kit_open_rate:.2f}% → {open_rate:.4f} (decimal)")
     logger.info(f"CTOR (Calculated): {ctor * 100:.2f}% → {ctor:.4f} (decimal)")
+
+    # Use content clicks for Total Clicks in Notion (excluding system links)
+    # Falls back to Kit's total_clicks if detailed click data unavailable
+    total_clicks_for_notion = clicks_for_ctor if content_clicks is not None else total_clicks
+    logger.info(f"Total Clicks for Notion: {total_clicks_for_notion}")
 
     payload = {
         "properties": {
@@ -225,7 +230,7 @@ def update_notion_email_stats(page_id: str, stats: Dict, content_clicks: int = N
                 "number": total_opens
             },
             "Total Clicks": {
-                "number": total_clicks
+                "number": total_clicks_for_notion
             },
             "Open Rate": {
                 "number": open_rate
