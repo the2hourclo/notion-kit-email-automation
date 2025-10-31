@@ -84,9 +84,26 @@ def get_kit_broadcast_stats(broadcast_id: str) -> Optional[Dict]:
         return None
 
 
-def get_kit_broadcast_clicks(broadcast_id: str) -> Optional[List[Dict]]:
-    """Get detailed click data for a broadcast from Kit API"""
+def get_kit_broadcast_clicks(broadcast_id: str) -> Dict:
+    """Get detailed click data for a broadcast from Kit API
+
+    Returns:
+        Dict with 'content_clicks' (int) and 'click_details' (list)
+        content_clicks excludes system links (affiliate, unsubscribe, etc.)
+    """
     url = f'https://api.kit.com/v4/broadcasts/{broadcast_id}/clicks'
+
+    # System/automated links to exclude from content click count
+    SYSTEM_LINK_PATTERNS = [
+        '{{affiliate_url}}',
+        'unsubscribe',
+        'preferences',
+        'update-profile',
+        'manage-preferences',
+        'view-in-browser',
+        'convertkit.com',
+        'kit.com'
+    ]
 
     try:
         response = requests.get(url, headers=KIT_HEADERS)
@@ -95,21 +112,37 @@ def get_kit_broadcast_clicks(broadcast_id: str) -> Optional[List[Dict]]:
 
         # Log the click details
         clicks = response_data.get('clicks', [])
+        content_clicks_count = 0
+
         if clicks:
             logger.info(f"📊 Click details for broadcast {broadcast_id}:")
             for click_data in clicks:
                 url_clicked = click_data.get('url', 'Unknown URL')
                 click_count = click_data.get('clicks', 0)
                 unique_clicks = click_data.get('unique_clicks', 0)
-                logger.info(f"  🔗 {url_clicked}")
-                logger.info(f"     Total clicks: {click_count}, Unique: {unique_clicks}")
+
+                # Check if this is a system link
+                is_system_link = any(pattern.lower() in url_clicked.lower() for pattern in SYSTEM_LINK_PATTERNS)
+
+                if is_system_link:
+                    logger.info(f"  🔗 {url_clicked} [SYSTEM LINK - excluded from CTOR]")
+                    logger.info(f"     Total clicks: {click_count}, Unique: {unique_clicks}")
+                else:
+                    logger.info(f"  🔗 {url_clicked} [CONTENT LINK]")
+                    logger.info(f"     Total clicks: {click_count}, Unique: {unique_clicks}")
+                    content_clicks_count += click_count
+
+            logger.info(f"📊 Content clicks (excluding system links): {content_clicks_count}")
         else:
             logger.info(f"No click data available for broadcast {broadcast_id}")
 
-        return clicks
+        return {
+            'content_clicks': content_clicks_count,
+            'click_details': clicks
+        }
     except requests.exceptions.RequestException as e:
         logger.warning(f"Could not fetch click details: {e}")
-        # This is non-critical, so we don't fail the sync
+        # Return None to signal we couldn't get detailed data
         return None
 
 
@@ -138,8 +171,15 @@ def calculate_rate(numerator: int, denominator: int) -> float:
     return round((numerator / denominator) * 100, 2)
 
 
-def update_notion_email_stats(page_id: str, stats: Dict) -> bool:
-    """Update Notion page with Kit broadcast stats"""
+def update_notion_email_stats(page_id: str, stats: Dict, content_clicks: int = None) -> bool:
+    """Update Notion page with Kit broadcast stats
+
+    Args:
+        page_id: Notion page ID
+        stats: Kit broadcast stats
+        content_clicks: Number of content clicks (excluding system links)
+                       If None, falls back to total_clicks from Kit API
+    """
     url = f'https://api.notion.com/v1/pages/{page_id}'
 
     # Extract stats from Kit response
@@ -154,20 +194,27 @@ def update_notion_email_stats(page_id: str, stats: Dict) -> bool:
     kit_open_rate = stats.get('open_rate', 0)
     open_rate = round(kit_open_rate / 100, 4)  # 18.09 → 0.1809
 
-    # Calculate CTOR (Click-to-Open Rate) = clicks / opens
-    # This is more meaningful than CTR (clicks / recipients)
-    # CTOR shows engagement from people who actually opened the email
-    if total_opens > 0:
-        ctor_percentage = (total_clicks / total_opens) * 100  # e.g., 2/157 = 1.27%
-        click_rate = round(ctor_percentage / 100, 4)  # Convert to decimal: 1.27% → 0.0127
-        logger.info(f"📊 CTOR Calculation: {total_clicks} clicks ÷ {total_opens} opens = {ctor_percentage:.2f}%")
+    # Calculate CTOR (Click-to-Open Rate) using content clicks only
+    # Content clicks exclude system links (affiliate, unsubscribe, etc.)
+    # This measures actual engagement with email copy/CTAs
+    if content_clicks is not None:
+        clicks_for_ctor = content_clicks
+        logger.info(f"📊 Using content clicks for CTOR: {clicks_for_ctor} (excludes system links)")
     else:
-        click_rate = 0.0
+        clicks_for_ctor = total_clicks
+        logger.info(f"📊 Using total clicks for CTOR: {clicks_for_ctor} (detailed click data unavailable)")
+
+    if total_opens > 0:
+        ctor_percentage = (clicks_for_ctor / total_opens) * 100
+        ctor = round(ctor_percentage / 100, 4)  # Convert to decimal for Notion
+        logger.info(f"📊 CTOR Calculation: {clicks_for_ctor} content clicks ÷ {total_opens} opens = {ctor_percentage:.2f}%")
+    else:
+        ctor = 0.0
         logger.info(f"📊 CTOR: No opens yet, CTOR = 0%")
 
-    logger.info(f"Extracted stats - Recipients: {recipients}, Opens: {total_opens}, Clicks: {total_clicks}")
+    logger.info(f"Extracted stats - Recipients: {recipients}, Opens: {total_opens}, Total Clicks: {total_clicks}, Content Clicks: {clicks_for_ctor}")
     logger.info(f"Open Rate (Kit): {kit_open_rate:.2f}% → {open_rate:.4f} (decimal)")
-    logger.info(f"CTOR (Calculated): {click_rate * 100:.2f}% → {click_rate:.4f} (decimal)")
+    logger.info(f"CTOR (Calculated): {ctor * 100:.2f}% → {ctor:.4f} (decimal)")
 
     payload = {
         "properties": {
@@ -183,8 +230,8 @@ def update_notion_email_stats(page_id: str, stats: Dict) -> bool:
             "Open Rate": {
                 "number": open_rate
             },
-            "Click Rate": {
-                "number": click_rate
+            "Click to Open Rate": {
+                "number": ctor
             }
         }
     }
@@ -194,7 +241,7 @@ def update_notion_email_stats(page_id: str, stats: Dict) -> bool:
     try:
         response = requests.patch(url, headers=NOTION_HEADERS, json=payload)
         response.raise_for_status()
-        logger.info(f"Updated stats for page {page_id}: OR={open_rate}%, CR={click_rate}%")
+        logger.info(f"Updated stats for page {page_id}: OR={open_rate * 100:.2f}%, CTOR={ctor * 100:.2f}%")
         return True
     except requests.exceptions.RequestException as e:
         logger.error(f"Error updating Notion page: {e}")
@@ -230,11 +277,12 @@ def sync_email_stats(email_page: Dict) -> bool:
 
     logger.info(f"Stats to sync: {stats}")
 
-    # Get detailed click information (non-critical)
-    get_kit_broadcast_clicks(broadcast_id)
+    # Get detailed click information to calculate accurate CTOR (excluding system links)
+    click_data = get_kit_broadcast_clicks(broadcast_id)
+    content_clicks = click_data.get('content_clicks', None) if click_data else None
 
-    # Update Notion with stats
-    success = update_notion_email_stats(page_id, stats)
+    # Update Notion with stats, passing content clicks for accurate CTOR
+    success = update_notion_email_stats(page_id, stats, content_clicks)
 
     if success:
         logger.info(f"✅ Successfully synced stats for: {name}")
