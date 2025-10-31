@@ -84,6 +84,35 @@ def get_kit_broadcast_stats(broadcast_id: str) -> Optional[Dict]:
         return None
 
 
+def get_kit_broadcast_clicks(broadcast_id: str) -> Optional[List[Dict]]:
+    """Get detailed click data for a broadcast from Kit API"""
+    url = f'https://api.kit.com/v4/broadcasts/{broadcast_id}/clicks'
+
+    try:
+        response = requests.get(url, headers=KIT_HEADERS)
+        response.raise_for_status()
+        response_data = response.json()
+
+        # Log the click details
+        clicks = response_data.get('clicks', [])
+        if clicks:
+            logger.info(f"📊 Click details for broadcast {broadcast_id}:")
+            for click_data in clicks:
+                url_clicked = click_data.get('url', 'Unknown URL')
+                click_count = click_data.get('clicks', 0)
+                unique_clicks = click_data.get('unique_clicks', 0)
+                logger.info(f"  🔗 {url_clicked}")
+                logger.info(f"     Total clicks: {click_count}, Unique: {unique_clicks}")
+        else:
+            logger.info(f"No click data available for broadcast {broadcast_id}")
+
+        return clicks
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"Could not fetch click details: {e}")
+        # This is non-critical, so we don't fail the sync
+        return None
+
+
 def extract_property_value(properties: Dict, prop_name: str, prop_type: str) -> any:
     """Extract value from Notion property"""
     prop = properties.get(prop_name, {})
@@ -123,14 +152,22 @@ def update_notion_email_stats(page_id: str, stats: Dict) -> bool:
     # Notion percent format expects decimals (e.g., 0.1809 = 18.09%)
     # Convert: divide by 100 to get decimal format
     kit_open_rate = stats.get('open_rate', 0)
-    kit_click_rate = stats.get('click_rate', 0)
-
     open_rate = round(kit_open_rate / 100, 4)  # 18.09 → 0.1809
-    click_rate = round(kit_click_rate / 100, 4)  # 0.23 → 0.0023
+
+    # Calculate CTOR (Click-to-Open Rate) = clicks / opens
+    # This is more meaningful than CTR (clicks / recipients)
+    # CTOR shows engagement from people who actually opened the email
+    if total_opens > 0:
+        ctor_percentage = (total_clicks / total_opens) * 100  # e.g., 2/157 = 1.27%
+        click_rate = round(ctor_percentage / 100, 4)  # Convert to decimal: 1.27% → 0.0127
+        logger.info(f"📊 CTOR Calculation: {total_clicks} clicks ÷ {total_opens} opens = {ctor_percentage:.2f}%")
+    else:
+        click_rate = 0.0
+        logger.info(f"📊 CTOR: No opens yet, CTOR = 0%")
 
     logger.info(f"Extracted stats - Recipients: {recipients}, Opens: {total_opens}, Clicks: {total_clicks}")
-    logger.info(f"Kit rates (percentage): Open Rate: {kit_open_rate}%, Click Rate: {kit_click_rate}%")
-    logger.info(f"Notion rates (decimal): Open Rate: {open_rate}, Click Rate: {click_rate}")
+    logger.info(f"Open Rate (Kit): {kit_open_rate:.2f}% → {open_rate:.4f} (decimal)")
+    logger.info(f"CTOR (Calculated): {click_rate * 100:.2f}% → {click_rate:.4f} (decimal)")
 
     payload = {
         "properties": {
@@ -192,6 +229,9 @@ def sync_email_stats(email_page: Dict) -> bool:
         return False
 
     logger.info(f"Stats to sync: {stats}")
+
+    # Get detailed click information (non-critical)
+    get_kit_broadcast_clicks(broadcast_id)
 
     # Update Notion with stats
     success = update_notion_email_stats(page_id, stats)
