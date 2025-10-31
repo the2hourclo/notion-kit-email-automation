@@ -70,8 +70,11 @@ def get_kit_broadcast_stats(broadcast_id: str) -> Optional[Dict]:
     try:
         response = requests.get(url, headers=KIT_HEADERS)
         response.raise_for_status()
-        stats = response.json().get('broadcast_stats', {})
-        logger.info(f"Retrieved stats for broadcast {broadcast_id}")
+        response_data = response.json()
+        logger.info(f"Kit API response for broadcast {broadcast_id}: {response_data}")
+
+        stats = response_data.get('broadcast_stats', {})
+        logger.info(f"Retrieved stats for broadcast {broadcast_id}: {stats}")
         return stats
     except requests.exceptions.RequestException as e:
         logger.error(f"Error getting Kit broadcast stats: {e}")
@@ -114,9 +117,13 @@ def update_notion_email_stats(page_id: str, stats: Dict) -> bool:
     total_clicks = stats.get('click', 0)
     unique_opens = stats.get('unopen', 0)  # Kit API returns unique opens as 'unopen'
 
+    logger.info(f"Extracted stats - Recipients: {recipients}, Opens: {total_opens}, Clicks: {total_clicks}")
+
     # Calculate rates
     open_rate = calculate_rate(total_opens, recipients) if recipients > 0 else 0
     click_rate = calculate_rate(total_clicks, recipients) if recipients > 0 else 0
+
+    logger.info(f"Calculated rates - Open Rate: {open_rate}%, Click Rate: {click_rate}%")
 
     payload = {
         "properties": {
@@ -137,6 +144,8 @@ def update_notion_email_stats(page_id: str, stats: Dict) -> bool:
             }
         }
     }
+
+    logger.info(f"Notion update payload: {payload}")
 
     try:
         response = requests.patch(url, headers=NOTION_HEADERS, json=payload)
@@ -167,9 +176,15 @@ def sync_email_stats(email_page: Dict) -> bool:
     # Get stats from Kit
     stats = get_kit_broadcast_stats(broadcast_id)
 
-    if not stats:
-        logger.error(f"Failed to get stats for broadcast {broadcast_id}")
+    if stats is None:
+        logger.error(f"Failed to get stats for broadcast {broadcast_id} - API returned None")
         return False
+
+    if not stats:
+        logger.error(f"Failed to get stats for broadcast {broadcast_id} - stats dict is empty: {stats}")
+        return False
+
+    logger.info(f"Stats to sync: {stats}")
 
     # Update Notion with stats
     success = update_notion_email_stats(page_id, stats)
