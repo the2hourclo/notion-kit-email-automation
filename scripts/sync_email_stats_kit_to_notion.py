@@ -73,7 +73,9 @@ def get_kit_broadcast_stats(broadcast_id: str) -> Optional[Dict]:
         response_data = response.json()
         logger.info(f"Kit API response for broadcast {broadcast_id}: {response_data}")
 
-        stats = response_data.get('broadcast_stats', {})
+        # Kit API returns: { "broadcast": { "id": ..., "stats": { ... } } }
+        broadcast = response_data.get('broadcast', {})
+        stats = broadcast.get('stats', {})
         logger.info(f"Retrieved stats for broadcast {broadcast_id}: {stats}")
         return stats
     except requests.exceptions.RequestException as e:
@@ -112,18 +114,17 @@ def update_notion_email_stats(page_id: str, stats: Dict) -> bool:
     url = f'https://api.notion.com/v1/pages/{page_id}'
 
     # Extract stats from Kit response
+    # Kit API v4 returns: recipients, emails_opened, total_clicks, open_rate, click_rate
     recipients = stats.get('recipients', 0)
-    total_opens = stats.get('open', 0)
-    total_clicks = stats.get('click', 0)
-    unique_opens = stats.get('unopen', 0)  # Kit API returns unique opens as 'unopen'
+    total_opens = stats.get('emails_opened', 0)
+    total_clicks = stats.get('total_clicks', 0)
+
+    # Kit provides pre-calculated rates as percentages
+    open_rate = round(stats.get('open_rate', 0), 2)
+    click_rate = round(stats.get('click_rate', 0), 2)
 
     logger.info(f"Extracted stats - Recipients: {recipients}, Opens: {total_opens}, Clicks: {total_clicks}")
-
-    # Calculate rates
-    open_rate = calculate_rate(total_opens, recipients) if recipients > 0 else 0
-    click_rate = calculate_rate(total_clicks, recipients) if recipients > 0 else 0
-
-    logger.info(f"Calculated rates - Open Rate: {open_rate}%, Click Rate: {click_rate}%")
+    logger.info(f"Kit provided rates - Open Rate: {open_rate}%, Click Rate: {click_rate}%")
 
     payload = {
         "properties": {
