@@ -34,13 +34,13 @@ jobs:
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
           EMAILS_DATABASE_ID: ${{ secrets.EMAILS_DATABASE_ID }}
-        run: python scripts/send_emails_notion_to_kit.py
+        run: python scripts/email_automation/send_emails_notion_to_kit.py
 
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: email-sender-logs
-          path: scripts/email_sender.log
+          path: scripts/email_automation/email_sender.log
           retention-days: 30
 

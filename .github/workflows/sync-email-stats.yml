@@ -31,12 +31,12 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           KIT_API_KEY: ${{ secrets.KIT_API_KEY }}
           EMAILS_DATABASE_ID: ${{ secrets.EMAILS_DATABASE_ID }}
-        run: python scripts/sync_email_stats_kit_to_notion.py
+        run: python scripts/email_automation/sync_email_stats_kit_to_notion.py
 
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: stats-sync-logs
-          path: scripts/stats_sync.log
+          path: scripts/email_automation/stats_sync.log
           retention-days: 30
